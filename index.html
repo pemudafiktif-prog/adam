@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyberpunk Realistic Highway & City 3D - Simulation</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: #030712;
+      color: #fff;
+      font-family: 'Orbitron', 'Segoe UI', Tahoma, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .hud-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
+      padding: 15px 25px;
+      border-radius: 16px;
+      pointer-events: auto;
+    }
+    .brand-title {
+      font-size: 20px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ff007f, #00f0ff, #7000ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 2px;
+      text-shadow: 0 0 15px rgba(255, 0, 127, 0.6);
+    }
+    .hud-controls {
+      display: flex;
+      gap: 12px;
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.5);
+      color: #00f0ff;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+    .btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+      transform: translateY(-2px);
+    }
+    .btn-primary {
+      background: #ff007f;
+      border-color: #ff007f;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(255, 0, 127, 0.5);
+    }
+    .btn-primary:hover {
+      background: #ff2a9d;
+      box-shadow: 0 0 20px rgba(255, 0, 127, 0.8);
+    }
+    .hud-bottom {
+      display: flex;
+      gap: 20px;
+      pointer-events: auto;
+    }
+    .status-card {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 12px;
+      min-width: 170px;
+      text-align: center;
+    }
+    .status-title {
+      font-size: 11px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 5px;
+    }
+    .status-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: #00f0ff;
+    }
+    .light-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .light-red { background: #ff0055; box-shadow: 0 0 14px #ff0055; }
+    .light-yellow { background: #ffcc00; box-shadow: 0 0 14px #ffcc00; }
+    .light-green { background: #00ff66; box-shadow: 0 0 14px #00ff66; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  
+  <div class="hud-layer">
+    <div class="hud-header">
+      <div class="brand-title">CYBERPUNK CITY LIGHTS 3D</div>
+      <div class="hud-controls">
+        <button class="btn" id="btn-cam">KAMERA: DRONE AUTO</button>
+        <button class="btn btn-primary" id="btn-mode">LALU LINTAS: OTOMATIS</button>
+      </div>
+    </div>
+    
+    <div class="hud-bottom">
+      <div class="status-card">
+        <div class="status-title">UTARA - SELATAN</div>
+        <div class="status-val" id="timer-ns">
+          <span class="light-indicator light-green" id="ind-ns"></span><span id="val-ns">15s (GREEN)</span>
+        </div>
+      </div>
+      <div class="status-card">
+        <div class="status-title">TIMUR - BARAT</div>
+        <div class="status-val" id="timer-ew">
+          <span class="light-indicator light-red" id="ind-ew"></span><span id="val-ew">18s (RED)</span>
+        </div>
+      </div>
+      <div class="status-card">
+        <div class="status-title">TOTAL KENDARAAN</div>
+        <div class="status-val" id="car-count">0</div>
+      </div>
+      <div class="status-card">
+        <div class="status-title">SISTEM ANTI-TABRAKAN</div>
+        <div class="status-val" style="color: #00ff66; font-size: 16px;">AKTIF (AMAN)</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- SCENE SETUP ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050515); 
+    scene.fog = new THREE.FogExp2(0x0a0c20, 0.005);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(70, 55, 70);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.02;
+
+    // --- CYBERPUNK CITY LIGHTING ---
+    const ambientLight = new THREE.AmbientLight(0x38bdf8, 0.85);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xff00aa, 0.9);
+    dirLight.position.set(80, 120, 50);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    const fillLight = new THREE.DirectionalLight(0x00f0ff, 0.9);
+    fillLight.position.set(-80, 60, -50);
+    scene.add(fillLight);
+
+    const centerPointLight = new THREE.PointLight(0x00ffff, 2.5, 70);
+    centerPointLight.position.set(0, 12, 0);
+    scene.add(centerPointLight);
+
+    // --- ENVIRONMENT: REALISTIC ROAD, SIDEWALKS & GREENERY ---
+    const groundGeo = new THREE.PlaneGeometry(300, 300);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x050811, roughness: 0.9 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const roadWidth = 14;
+    // Realistic Asphalt Road
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6, metalness: 0.1 });
+    
+    const nsRoad = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, 300), roadMat);
+    nsRoad.rotation.x = -Math.PI / 2;
+    nsRoad.position.y = 0.01;
+    nsRoad.receiveShadow = true;
+    scene.add(nsRoad);
+
+    const ewRoad = new THREE.Mesh(new THREE.PlaneGeometry(300, roadWidth), roadMat);
+    ewRoad.rotation.x = -Math.PI / 2;
+    ewRoad.position.y = 0.01;
+    ewRoad.receiveShadow = true;
+    scene.add(ewRoad);
+
+    // Grid Floor Overlay
+    const gridHelper = new THREE.GridHelper(300, 60, 0xff007f, 0x00f0ff);
+    gridHelper.position.y = 0.02;
+    scene.add(gridHelper);
+
+    // Neat Sidewalks & Curbstones
+    function createSidewalks() {
+      const swMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
+      const curbMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5 });
+
+      const swWidth = 5;
+      const swHeight = 0.4;
+
+      // 4 Quadrant Sidewalks
+      const quadrants = [
+        { x: -16 - swWidth/2, z: -16 - swWidth/2 },
+        { x: 16 + swWidth/2, z: -16 - swWidth/2 },
+        { x: -16 - swWidth/2, z: 16 + swWidth/2 },
+        { x: 16 + swWidth/2, z: 16 + swWidth/2 }
+      ];
+
+      quadrants.forEach(q => {
+        const swMesh = new THREE.Mesh(new THREE.BoxGeometry(100, swHeight, 100), swMat);
+        swMesh.position.set(q.x < 0 ? q.x - 45 : q.x + 45, swHeight / 2, q.z < 0 ? q.z - 45 : q.z + 45);
+        swMesh.receiveShadow = true;
+        scene.add(swMesh);
+      });
+    }
+    createSidewalks();
+
+    // Road Markings (Lane Lines & Zebra Crossings)
+    function createRoadMarkings() {
+      const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const yellowLineMat = new THREE.MeshBasicMaterial({ color: 0xfcb316 });
+
+      // Dashed Lane Dividers (NS & EW)
+      for (let i = -140; i <= 140; i += 12) {
+        if (Math.abs(i) < 18) continue; // Skip intersection
+
+        // Center Yellow Line NS
+        const nsLine = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 6), yellowLineMat);
+        nsLine.rotation.x = -Math.PI / 2;
+        nsLine.position.set(0, 0.02, i);
+        scene.add(nsLine);
+
+        // Center Yellow Line EW
+        const ewLine = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.3), yellowLineMat);
+        ewLine.rotation.x = -Math.PI / 2;
+        ewLine.position.set(i, 0.02, 0);
+        scene.add(ewLine);
+      }
+
+      // Zebra Crossings
+      for (let offset = -5; offset <= 5; offset += 1.8) {
+        const zN = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 3.5), lineMat);
+        zN.rotation.x = -Math.PI / 2;
+        zN.position.set(offset, 0.03, -11);
+        scene.add(zN);
+
+        const zS = zN.clone(); zS.position.set(offset, 0.03, 11); scene.add(zS);
+
+        const zE = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 1.0), lineMat);
+        zE.rotation.x = -Math.PI / 2;
+        zE.position.set(11, 0.03, offset);
+        scene.add(zE);
+
+        const zW = zE.clone(); zW.position.set(-11, 0.03, offset); scene.add(zW);
+      }
+    }
+    createRoadMarkings();
+
+    // Plants & Trees Generator
+    function createVegetation() {
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3f2e1e, roughness: 0.9 });
+      const leavesMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.4 });
+      const bushMat = new THREE.MeshStandardMaterial({ color: 0x059669, roughness: 0.5 });
+
+      // Planting along Sidewalk Edges
+      const plantPositions = [
+        // NS Sides
+        { x: -8.5, z: -30 }, { x: -8.5, z: -60 }, { x: -8.5, z: -90 },
+        { x: 8.5, z: -30 }, { x: 8.5, z: -60 }, { x: 8.5, z: -90 },
+        { x: -8.5, z: 30 }, { x: -8.5, z: 60 }, { x: -8.5, z: 90 },
+        { x: 8.5, z: 30 }, { x: 8.5, z: 60 }, { x: 8.5, z: 90 },
+        // EW Sides
+        { x: -30, z: -8.5 }, { x: -60, z: -8.5 }, { x: -90, z: -8.5 },
+        { x: -30, z: 8.5 }, { x: -60, z: 8.5 }, { x: -90, z: 8.5 },
+        { x: 30, z: -8.5 }, { x: 60, z: -8.5 }, { x: 90, z: -8.5 },
+        { x: 30, z: 8.5 }, { x: 60, z: 8.5 }, { x: 90, z: 8.5 }
+      ];
+
+      plantPositions.forEach(p => {
+        const treeGroup = new THREE.Group();
+
+        // Trunk
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 4), trunkMat);
+        trunk.position.y = 2;
+        trunk.castShadow = true;
+        treeGroup.add(trunk);
+
+        // Foliage Layers
+        const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.2, 5, 8), leavesMat);
+        leaves.position.y = 5.5;
+        leaves.castShadow = true;
+        treeGroup.add(leaves);
+
+        // Small Bushes at Base
+        const bush = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 8), bushMat);
+        bush.position.set(0.6, 0.6, 0.4);
+        treeGroup.add(bush);
+
+        treeGroup.position.set(p.x, 0.4, p.z);
+        scene.add(treeGroup);
+      });
+    }
+    createVegetation();
+
+    // Dynamic City Skylines with Glowing Neon Windows
+    function createCity() {
+      const bColors = [0x0f172a, 0x1e1b4b, 0x1e293b, 0x311042];
+      const neonColors = [0x00f0ff, 0xff007f, 0x7000ff, 0x00ff66, 0xffcc00];
+
+      for (let x = -110; x <= 110; x += 32) {
+        for (let z = -110; z <= 110; z += 32) {
+          if (Math.abs(x) < 22 || Math.abs(z) < 22) continue;
+
+          const h = 22 + Math.random() * 50;
+          const w = 20 + Math.random() * 4;
+          const d = 20 + Math.random() * 4;
+
+          const bMat = new THREE.MeshStandardMaterial({
+            color: bColors[Math.floor(Math.random() * bColors.length)],
+            roughness: 0.1,
+            metalness: 0.8
+          });
+          const bMesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), bMat);
+          bMesh.position.set(x, h / 2, z);
+          bMesh.castShadow = true;
+          scene.add(bMesh);
+
+          // Glowing Roof Neon Trim
+          const neonColor = neonColors[Math.floor(Math.random() * neonColors.length)];
+          const roofGeo = new THREE.BoxGeometry(w + 0.6, 0.8, d + 0.6);
+          const roofMat = new THREE.MeshBasicMaterial({ color: neonColor });
+          const roof = new THREE.Mesh(roofGeo, roofMat);
+          roof.position.set(x, h + 0.4, z);
+          scene.add(roof);
+
+          // Building Wall Neon Billboard/Light Grid
+          const billboardMat = new THREE.MeshBasicMaterial({ color: neonColor });
+          const bbMesh = new THREE.Mesh(new THREE.BoxGeometry(w * 0.6, 3, 0.2), billboardMat);
+          bbMesh.position.set(x, h * 0.7, z + d / 2 + 0.1);
+          scene.add(bbMesh);
+
+          // Pointlights for Citylights Reflection
+          if (Math.random() > 0.4) {
+            const pLight = new THREE.PointLight(neonColor, 1.2, 35);
+            pLight.position.set(x, h * 0.5, z);
+            scene.add(pLight);
+          }
+        }
+      }
+    }
+    createCity();
+
+    // --- TRAFFIC LIGHT SYSTEM ---
+    let stateNS = 'GREEN';
+    let stateEW = 'RED';
+    let timerNS = 15;
+    let timerEW = 18;
+
+    const lights3D = {};
+    function createTrafficLight(name, x, z, rotY) {
+      const group = new THREE.Group();
+      
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8 });
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 8), poleMat);
+      pole.position.y = 4;
+      group.add(pole);
+
+      const boxMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 });
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.4, 3.4, 1.4), boxMat);
+      box.position.y = 7;
+      group.add(box);
+
+      const rGeo = new THREE.SphereGeometry(0.38, 16, 16);
+      const rMesh = new THREE.Mesh(rGeo, new THREE.MeshBasicMaterial({ color: 0x330000 }));
+      const yMesh = new THREE.Mesh(rGeo, new THREE.MeshBasicMaterial({ color: 0x333300 }));
+      const gMesh = new THREE.Mesh(rGeo, new THREE.MeshBasicMaterial({ color: 0x003300 }));
+
+      rMesh.position.set(0, 7.9, 0.7);
+      yMesh.position.set(0, 7.0, 0.7);
+      gMesh.position.set(0, 6.1, 0.7);
+
+      group.add(rMesh, yMesh, gMesh);
+
+      // Light Beams/Glows
+      const lightGlow = new THREE.PointLight(0x00ff66, 1.5, 20);
+      lightGlow.position.set(0, 7, 1);
+      group.add(lightGlow);
+
+      group.position.set(x, 0, z);
+      group.rotation.y = rotY;
+      scene.add(group);
+
+      lights3D[name] = { red: rMesh, yellow: yMesh, green: gMesh, glow: lightGlow };
+    }
+
+    createTrafficLight('N', -9, -9, 0);
+    createTrafficLight('S', 9, 9, Math.PI);
+    createTrafficLight('E', 9, -9, Math.PI / 2);
+    createTrafficLight('W', -9, 9, -Math.PI / 2);
+
+    function updateLightsVisual() {
+      const setMat = (lightObj, activeColor) => {
+        lightObj.red.material.color.setHex(activeColor === 'RED' ? 0xff0055 : 0x330000);
+        lightObj.yellow.material.color.setHex(activeColor === 'YELLOW' ? 0xffcc00 : 0x333300);
+        lightObj.green.material.color.setHex(activeColor === 'GREEN' ? 0x00ff66 : 0x003300);
+        
+        let hexGlow = 0x00ff66;
+        if (activeColor === 'RED') hexGlow = 0xff0055;
+        if (activeColor === 'YELLOW') hexGlow = 0xffcc00;
+        lightObj.glow.color.setHex(hexGlow);
+      };
+
+      setMat(lights3D['N'], stateNS);
+      setMat(lights3D['S'], stateNS);
+      setMat(lights3D['E'], stateEW);
+      setMat(lights3D['W'], stateEW);
+
+      document.getElementById('ind-ns').className = `light-indicator light-${stateNS.toLowerCase()}`;
+      document.getElementById('ind-ew').className = `light-indicator light-${stateEW.toLowerCase()}`;
+      document.getElementById('val-ns').innerText = `${timerNS}s (${stateNS})`;
+      document.getElementById('val-ew').innerText = `${timerEW}s (${stateEW})`;
+    }
+
+    setInterval(() => {
+      if (timerNS > 0) timerNS--;
+      if (timerEW > 0) timerEW--;
+
+      if (stateNS === 'GREEN' && timerNS === 0) {
+        stateNS = 'YELLOW'; timerNS = 3;
+      } else if (stateNS === 'YELLOW' && timerNS === 0) {
+        stateNS = 'RED'; timerNS = 18;
+        stateEW = 'GREEN'; timerEW = 15;
+      }
+
+      if (stateEW === 'GREEN' && timerEW === 0) {
+        stateEW = 'YELLOW'; timerEW = 3;
+      } else if (stateEW === 'YELLOW' && timerEW === 0) {
+        stateEW = 'RED'; timerEW = 18;
+        stateNS = 'GREEN'; timerNS = 15;
+      }
+
+      updateLightsVisual();
+    }, 1000);
+
+    // --- CARS & ANTI-COLLISION AI ---
+    const cars = [];
+    const carColors = [0xff007f, 0x00f0ff, 0x8b5cf6, 0xf59e0b, 0x10b981, 0xec4899];
+
+    function spawnCar(dir) {
+      const group = new THREE.Group();
+      const color = carColors[Math.floor(Math.random() * carColors.length)];
+
+      // Metallic Body with Gloss Finish
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 1.1, 4.4),
+        new THREE.MeshStandardMaterial({ color: color, roughness: 0.1, metalness: 0.9 })
+      );
+      body.position.y = 0.8;
+      body.castShadow = true;
+      group.add(body);
+
+      // Neon Headlights & Underglow
+      const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.1), headMat);
+      hl1.position.set(-0.7, 0.8, 2.2);
+      const hl2 = hl1.clone();
+      hl2.position.set(0.7, 0.8, 2.2);
+      group.add(hl1, hl2);
+
+      const underglowMat = new THREE.MeshBasicMaterial({ color: color });
+      const ug = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 4.0), underglowMat);
+      ug.rotation.x = -Math.PI / 2;
+      ug.position.y = 0.05;
+      group.add(ug);
+
+      let pos = { x: 0, z: 0 };
+      let rot = 0;
+      let stopLine = 0;
+
+      if (dir === 'N') { pos = { x: -3.5, z: -110 }; rot = 0; stopLine = -10; }
+      if (dir === 'S') { pos = { x: 3.5, z: 110 }; rot = Math.PI; stopLine = 10; }
+      if (dir === 'E') { pos = { x: 110, z: -3.5 }; rot = -Math.PI / 2; stopLine = 10; }
+      if (dir === 'W') { pos = { x: -110, z: 3.5 }; rot = Math.PI / 2; stopLine = -10; }
+
+      group.position.set(pos.x, 0, pos.z);
+      group.rotation.y = rot;
+      scene.add(group);
+
+      cars.push({
+        mesh: group,
+        dir: dir,
+        speed: 0,
+        maxSpeed: 0.35 + Math.random() * 0.1,
+        stopLine: stopLine
+      });
+
+      document.getElementById('car-count').innerText = cars.length;
+    }
+
+    setInterval(() => {
+      const dirs = ['N', 'S', 'E', 'W'];
+      if (cars.length < 24) {
+        spawnCar(dirs[Math.floor(Math.random() * dirs.length)]);
+      }
+    }, 1400);
+
+    function updateCars() {
+      const SAFE_DISTANCE = 8.0;
+
+      cars.forEach((car, index) => {
+        let targetSpeed = car.maxSpeed;
+        const pos = car.mesh.position;
+
+        let isRed = false;
+        if (car.dir === 'N' && pos.z < car.stopLine && pos.z > car.stopLine - 16) isRed = (stateNS !== 'GREEN');
+        if (car.dir === 'S' && pos.z > car.stopLine && pos.z < car.stopLine + 16) isRed = (stateNS !== 'GREEN');
+        if (car.dir === 'E' && pos.x > car.stopLine && pos.x < car.stopLine + 16) isRed = (stateEW !== 'GREEN');
+        if (car.dir === 'W' && pos.x < car.stopLine && pos.x > car.stopLine - 16) isRed = (stateEW !== 'GREEN');
+
+        if (isRed) targetSpeed = 0;
+
+        cars.forEach((otherCar, otherIdx) => {
+          if (index === otherIdx || car.dir !== otherCar.dir) return;
+
+          let dist = 999;
+          if (car.dir === 'N' && otherCar.mesh.position.z > pos.z) dist = otherCar.mesh.position.z - pos.z;
+          if (car.dir === 'S' && otherCar.mesh.position.z < pos.z) dist = pos.z - otherCar.mesh.position.z;
+          if (car.dir === 'E' && otherCar.mesh.position.x < pos.x) dist = pos.x - otherCar.mesh.position.x;
+          if (car.dir === 'W' && otherCar.mesh.position.x > pos.x) dist = otherCar.mesh.position.x - pos.x;
+
+          if (dist > 0 && dist < SAFE_DISTANCE) {
+            targetSpeed = Math.min(targetSpeed, (dist / SAFE_DISTANCE) * otherCar.speed);
+          }
+        });
+
+        car.speed += (targetSpeed - car.speed) * 0.1;
+        if (car.speed < 0.001) car.speed = 0;
+
+        if (car.dir === 'N') pos.z += car.speed;
+        if (car.dir === 'S') pos.z -= car.speed;
+        if (car.dir === 'E') pos.x -= car.speed;
+        if (car.dir === 'W') pos.x += car.speed;
+
+        if (Math.abs(pos.x) > 130 || Math.abs(pos.z) > 130) {
+          scene.remove(car.mesh);
+          cars.splice(index, 1);
+          document.getElementById('car-count').innerText = cars.length;
+        }
+      });
+    }
+
+    // --- ANIMATION LOOP ---
+    let autoCam = true;
+    let camAngle = 0;
+
+    document.getElementById('btn-cam').addEventListener('click', () => {
+      autoCam = !autoCam;
+      document.getElementById('btn-cam').innerText = autoCam ? 'KAMERA: DRONE AUTO' : 'KAMERA: BEBAS ORBIT';
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateCars();
+
+      if (autoCam) {
+        camAngle += 0.002;
+        camera.position.x = Math.sin(camAngle) * 80;
+        camera.position.z = Math.cos(camAngle) * 80;
+        camera.position.y = 50;
+        camera.lookAt(0, 0, 0);
+      } else {
+        controls.update();
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+</html>
